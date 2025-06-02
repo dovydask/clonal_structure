@@ -28,7 +28,7 @@ class Node(object):
         self.emerged_history.append(emerged)    
         
 
-def process_pyclone_output(replicate, chosen_samples, pyclone_results_dir="./pyclone_output/March_2024/"):
+def process_pyclone_output(replicate, chosen_samples, pyclone_results_dir="./pyclone_output/"):
     
     results = pd.read_csv(pyclone_results_dir + replicate + "_final.tsv", sep="\t")
     n_samples = len(results["sample_id"].unique())
@@ -347,7 +347,6 @@ def compute_and_plot_clonal_structure(replicate, tree, variant_df, pyclone_resul
         ci += 1
     muller_colors = pd.Series(muller_colors)
 
-    colors_for_R = []
     custom_lines = []
     spaces = " "*np.max([len(clone_adjacency_df["Identity"][i]) for i in range(len(clone_adjacency_df))])*3
 
