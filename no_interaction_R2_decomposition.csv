@@ -1,0 +1,16 @@
+"","Medium","Term","R2"
+"1","Control","Treatment",0.00155122801528403
+"2","Control","Species",0.131552017587005
+"3","Control","Timepoint",0.113271481889307
+"4","Control","Random",0.177442975548048
+"5","Control","Residual",0.576182296960357
+"6","Salt stress","Treatment",6.66562369242229e-06
+"7","Salt stress","Species",0.127820108710248
+"8","Salt stress","Timepoint",0.0771295854086096
+"9","Salt stress","Random",0.153094497205499
+"10","Salt stress","Residual",0.641949143051951
+"11","Predator","Treatment",0.120247870498868
+"12","Predator","Species",0.372285188208765
+"13","Predator","Timepoint",0.0252307974527184
+"14","Predator","Random",0.091563620510751
+"15","Predator","Residual",0.390672523328897

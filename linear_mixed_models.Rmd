@@ -1,0 +1,507 @@
+---
+title: "linear_mixed_models"
+output: html_document
+date: "2025-10-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# install.packages('lme4', repos = c('https://lme4.r-universe.dev', getOption("repos")[["CRAN"]]))
+library(lme4)
+library(ggplot2)
+library(grid)
+library(gridExtra)
+library(latex2exp)
+rsq <- function (x, y) cor(x, y) ^ 2
+
+get_legend <- function(plot) {
+  pt <- ggplot_gtable(ggplot_build(plot)) 
+  legend <- which(sapply(pt$grobs, function(x) x$name) == "guide-box") 
+  return(pt$grobs[[legend]]) 
+}
+```
+
+```{r}
+data <- read.table("~/Desktop/Projects/LTEE/ancestral_evolved_aucs.csv", sep=",", header=TRUE)
+data$Species = as.factor(data$Species)
+data$Treatment = as.factor(data$Treatment)
+data$Medium = as.factor(data$Medium)
+data$Replicate = paste(data$Treatment, data$Species, data$Replicate, sep="_")
+data$Timepoint = as.factor(data$Timepoint)
+data$TreatmentTime = paste(data$Treatment, data$Timepoint, sep=" ")
+
+kb_data <- subset(data, Medium == "KB")
+kcl_data <- subset(data, Medium == "KCl")
+tetra_data <- subset(data, Medium == "Tetra")
+```
+# No-interaction model
+
+```{r, fig.height=4, fig.width=12}
+model_title <- "Ratio ~ History + Species + Timing + (1|Replicate)"
+
+kb_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kb_data)
+kcl_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kcl_data)
+tetra_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = tetra_data)
+
+kb_y_pred <- predict(kb_lmm, kb_data)
+kb_y_obs <- kb_data$Ratio
+kcl_y_pred <- predict(kcl_lmm, kcl_data)
+kcl_y_obs <- kcl_data$Ratio
+tetra_y_pred <- predict(tetra_lmm, tetra_data)
+tetra_y_obs <- tetra_data$Ratio
+
+kb_scatter_data <- data.frame(History=kb_data$Treatment, Species=kb_data$Species, Timepoint=kb_data$Timepoint, HistoryTiming=kb_data$TreatmentTime, KB_observed=kb_y_obs, KB_predicted=kb_y_pred)
+kcl_scatter_data <- data.frame(History=kcl_data$Treatment, Species=kcl_data$Species, Timepoint=kcl_data$Timepoint, HistoryTiming=kcl_data$TreatmentTime, KCl_observed=kcl_y_obs, KCl_predicted=kcl_y_pred)
+tetra_scatter_data <- data.frame(History=tetra_data$Treatment, Species=tetra_data$Species, Timepoint=tetra_data$Timepoint, HistoryTiming=tetra_data$TreatmentTime, Tetra_observed=tetra_y_obs, Tetra_predicted=tetra_y_pred)
+
+if (isSingular(kb_lmm)){
+  singular_label <- "Singular fit!"
+} else {
+  singular_label <- ""
+}
+
+kb_r2 <- toString(round(rsq(kb_y_obs, kb_y_pred), digits=2))
+
+axis_lims <- range(with(kb_scatter_data, c(KB_observed, KB_predicted)))
+g1 = ggplot(kb_scatter_data, aes(x=KB_observed, y=KB_predicted, color=Species, shape=HistoryTiming)) + geom_point(alpha=0.5) + geom_abline(linetype="dashed") + coord_cartesian(xlim = axis_lims, ylim = axis_lims) + 
+      annotation_custom(grid::textGrob(TeX(paste("$R^2$ =", kb_r2)), 0.1, 0.9, hjust=0)) + 
+      annotation_custom(grid::textGrob(singular_label, 0.1, 0.8, hjust=0)) +
+      scale_shape_manual(values=c(1, 16, 2, 17)) + 
+      theme(legend.position="none") + 
+      labs(x="Observed", y="Predicted", title="Control medium")
+  
+if (isSingular(kcl_lmm)){
+  singular_label <- "Singular fit!"
+} else {
+  singular_label <- ""
+}
+
+kcl_r2 <- toString(round(rsq(kcl_y_obs, kcl_y_pred), digits=2))
+
+axis_lims <- range(with(kcl_scatter_data, c(KCl_observed, KCl_predicted)))
+g2 = ggplot(kcl_scatter_data, aes(x=KCl_observed, y=KCl_predicted, color=Species, shape=HistoryTiming)) + geom_point(alpha=0.5) + geom_abline(linetype="dashed") + coord_cartesian(xlim = axis_lims, ylim = axis_lims) + 
+      annotation_custom(grid::textGrob(TeX(paste("$R^2$ =", kcl_r2)), 0.1, 0.9, hjust=0)) + 
+      annotation_custom(grid::textGrob(singular_label, 0.1, 0.8, hjust=0)) +
+      scale_shape_manual(values=c(1, 16, 2, 17)) + 
+      theme(legend.position="none") + 
+      labs(x="Observed", y="Predicted", title="Salt stress medium")
+
+if (isSingular(tetra_lmm)){
+  singular_label <- "Singular fit!"
+} else {
+  singular_label <- ""
+}
+
+tetra_r2 <- toString(round(rsq(tetra_y_obs, tetra_y_pred), digits=2))
+
+axis_lims <- range(with(tetra_scatter_data, c(Tetra_observed, Tetra_predicted)))
+g3 = ggplot(tetra_scatter_data, aes(x=Tetra_observed, y=Tetra_predicted, color=Species, shape=HistoryTiming)) + geom_point(alpha=0.5) + geom_abline(linetype="dashed") + coord_cartesian(xlim = axis_lims, ylim = axis_lims) + 
+      annotation_custom(grid::textGrob(TeX(paste("$R^2$ =", tetra_r2)), 0.1, 0.9, hjust=0)) + 
+      annotation_custom(grid::textGrob(singular_label, 0.1, 0.8, hjust=0)) +
+      scale_shape_manual(values=c(1, 16, 2, 17)) + 
+      theme(legend.position="none") + 
+      labs(x="Observed", y="Predicted", title="Predator medium")
+
+g0 <- ggplot(tetra_scatter_data, aes(x=Tetra_observed, y=Tetra_predicted, color=Species, shape=HistoryTiming)) + geom_point(alpha=0.5) + geom_abline(linetype="dashed") + coord_cartesian(xlim = axis_lims, ylim = axis_lims) + 
+      scale_shape_manual(values=c(1, 16, 2, 17)) + 
+      theme(legend.position="bottom") +
+      labs(x="Observed", y="Predicted", title="Predator medium")
+
+combined_plot <- grid.arrange(g1, g2, g3, ncol=3)
+legend <- get_legend(g0) 
+png("supplementary_figure_lmm_scatterplot.png", width=2000, height=800, units="px", res=200)
+grid.arrange(combined_plot, legend, nrow=2, top=textGrob(model_title, gp=gpar(fontsize=15)), heights=c(10, 1))
+dev.off()
+# ggsave(filename = "supplementary_figure_lmm_scatterplot.png", width = 5, height = 5, device='png', dpi=200)
+# dev.print(file="supplementary_figure_lmm_scatterplot.png", device=png, width=800)
+```
+
+```{r}
+library(partR2)
+library(patchwork)
+
+kb_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kb_data)
+kcl_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kcl_data)
+tetra_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = tetra_data)
+
+kb_partR2_cond <- partR2(kb_lmm, partvars=c("Treatment", "Species", "Timepoint"), R2_type="conditional", nboot=100)
+kcl_partR2_cond <- partR2(kcl_lmm, partvars=c("Treatment", "Species", "Timepoint"), R2_type="conditional", nboot=100)
+tetra_partR2_cond <- partR2(tetra_lmm, partvars=c("Treatment", "Species", "Timepoint"), R2_type="conditional", nboot=100)
+
+kb_partR2_marg <- partR2(kb_lmm, partvars=c("Treatment", "Species", "Timepoint"), R2_type="marginal", nboot=100)
+kcl_partR2_marg <- partR2(kcl_lmm, partvars=c("Treatment", "Species", "Timepoint"), R2_type="marginal", nboot=100)
+tetra_partR2_marg <- partR2(tetra_lmm, partvars=c("Treatment", "Species", "Timepoint"), R2_type="marginal", nboot=100)
+
+kb_total_R2 <- kb_partR2_cond$R2$estimate[1]
+kcl_total_R2 <- kcl_partR2_cond$R2$estimate[1]
+tetra_total_R2 <- tetra_partR2_cond$R2$estimate[1]
+
+kb_fixed_R2 <- kb_partR2_marg$R2$estimate[2:4]
+kcl_fixed_R2 <- kcl_partR2_marg$R2$estimate[2:4]
+tetra_fixed_R2 <- tetra_partR2_marg$R2$estimate[2:4]
+
+kb_fixed_total_R2 <- sum(kb_fixed_R2)
+kcl_fixed_total_R2 <- sum(kcl_fixed_R2)
+tetra_fixed_total_R2 <- sum(tetra_fixed_R2)
+
+kb_random_R2 <- kb_total_R2 - kb_fixed_total_R2
+kcl_random_R2 <- kcl_total_R2 - kcl_fixed_total_R2
+tetra_random_R2 <- tetra_total_R2 - tetra_fixed_total_R2
+
+kb_residual_R2 <- 1 - kb_total_R2
+kcl_residual_R2 <- 1 - kcl_total_R2
+tetra_residual_R2 <- 1 - tetra_total_R2
+
+kb_stacked <- c(kb_fixed_R2, kb_random_R2, kb_residual_R2)
+kcl_stacked <- c(kcl_fixed_R2, kcl_random_R2, kcl_residual_R2)
+tetra_stacked <- c(tetra_fixed_R2, tetra_random_R2, tetra_residual_R2)
+
+terms <- c(kb_partR2_marg$R2$term[2:4], "Random", "Residual", kcl_partR2_marg$R2$term[2:4], "Random", "Residual", tetra_partR2_marg$R2$term[2:4], "Random", "Residual")
+mediums <- c("Control", "Control", "Control", "Control", "Control", "Salt stress", "Salt stress", "Salt stress", "Salt stress", "Salt stress", "Predator", "Predator", "Predator", "Predator", "Predator")
+r2s <- c(kb_stacked, kcl_stacked, tetra_stacked)
+r2_data <- data.frame(Medium=mediums, Term=terms, R2=r2s)
+
+ggplot(r2_data, aes(fill=Term, y=R2, x=Medium)) + geom_bar(position="stack", stat="identity") + ylim(0, 1) + labs(title="No-interaction model\nExplained variance by main terms", y="% of variance explained")
+```
+
+# Interaction model
+
+```{r, fig.height=4, fig.width=12}
+model_title <- "Ratio ~ History + Species + Timing + History:Species + History:Timing + Species:Timing + (1|Replicate)"
+
+kb_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kb_data)
+kcl_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kcl_data)
+tetra_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = tetra_data)
+
+kb_y_obs <- kb_data$Ratio
+kb_y_pred <- fitted.values(kb_lmm)
+kcl_y_obs <- kcl_data$Ratio
+kcl_y_pred <- fitted.values(kcl_lmm)
+tetra_y_obs <- tetra_data$Ratio
+tetra_y_pred <- fitted.values(tetra_lmm)
+
+kb_scatter_data <- data.frame(History=kb_data$Treatment, Species=kb_data$Species, Timepoint=kb_data$Timepoint, HistoryTiming=kb_data$TreatmentTime, KB_observed=kb_y_obs, KB_predicted=kb_y_pred)
+kcl_scatter_data <- data.frame(History=kcl_data$Treatment, Species=kcl_data$Species, Timepoint=kcl_data$Timepoint, HistoryTiming=kcl_data$TreatmentTime, KCl_observed=kcl_y_obs, KCl_predicted=kcl_y_pred)
+tetra_scatter_data <- data.frame(History=tetra_data$Treatment, Species=tetra_data$Species, Timepoint=tetra_data$Timepoint, HistoryTiming=tetra_data$TreatmentTime, Tetra_observed=tetra_y_obs, Tetra_predicted=tetra_y_pred)
+
+if (isSingular(kb_lmm)){
+  singular_label <- "Singular fit!"
+} else {
+  singular_label <- ""
+}
+
+kb_r2 <- toString(round(rsq(kb_y_obs, kb_y_pred), digits=2))
+
+axis_lims <- range(with(kb_scatter_data, c(KB_observed, KB_predicted)))
+g1 = ggplot(kb_scatter_data, aes(x=KB_observed, y=KB_predicted, color=Species, shape=HistoryTiming)) + geom_point(alpha=0.5) + geom_abline(linetype="dashed") + coord_cartesian(xlim = axis_lims, ylim = axis_lims) + 
+      annotation_custom(grid::textGrob(TeX(paste("$R^2$ =", kb_r2)), 0.1, 0.9, hjust=0)) + 
+      annotation_custom(grid::textGrob(singular_label, 0.1, 0.8, hjust=0)) +
+      scale_shape_manual(values=c(1, 16, 2, 17)) + 
+      theme(legend.position="none") + 
+      labs(x="Observed", y="Predicted", title="Control medium")
+  
+if (isSingular(kcl_lmm)){
+  singular_label <- "Singular fit!"
+} else {
+  singular_label <- ""
+}
+
+kcl_r2 <- toString(round(rsq(kcl_y_obs, kcl_y_pred), digits=2))
+
+axis_lims <- range(with(kcl_scatter_data, c(KCl_observed, KCl_predicted)))
+g2 = ggplot(kcl_scatter_data, aes(x=KCl_observed, y=KCl_predicted, color=Species, shape=HistoryTiming)) + geom_point(alpha=0.5) + geom_abline(linetype="dashed") + coord_cartesian(xlim = axis_lims, ylim = axis_lims) + 
+      annotation_custom(grid::textGrob(TeX(paste("$R^2$ =", kcl_r2)), 0.1, 0.9, hjust=0)) + 
+      annotation_custom(grid::textGrob(singular_label, 0.1, 0.8, hjust=0)) +
+      scale_shape_manual(values=c(1, 16, 2, 17)) + 
+      theme(legend.position="none") + 
+      labs(x="Observed", y="Predicted", title="Salt stress medium")
+
+if (isSingular(tetra_lmm)){
+  singular_label <- "Singular fit!"
+} else {
+  singular_label <- ""
+}
+
+tetra_r2 <- toString(round(rsq(tetra_y_obs, tetra_y_pred), digits=2))
+
+axis_lims <- range(with(tetra_scatter_data, c(Tetra_observed, Tetra_predicted)))
+g3 = ggplot(tetra_scatter_data, aes(x=Tetra_observed, y=Tetra_predicted, color=Species, shape=HistoryTiming)) + geom_point(alpha=0.5) + geom_abline(linetype="dashed") + coord_cartesian(xlim = axis_lims, ylim = axis_lims) + 
+      annotation_custom(grid::textGrob(TeX(paste("$R^2$ =", tetra_r2)), 0.1, 0.9, hjust=0)) + 
+      annotation_custom(grid::textGrob(singular_label, 0.1, 0.8, hjust=0)) +
+      scale_shape_manual(values=c(1, 16, 2, 17)) + 
+      theme(legend.position="none") + 
+      labs(x="Observed", y="Predicted", title="Predator medium")
+
+g0 <- ggplot(tetra_scatter_data, aes(x=Tetra_observed, y=Tetra_predicted, color=Species, shape=HistoryTiming)) + geom_point(alpha=0.5) + geom_abline(linetype="dashed") + coord_cartesian(xlim = axis_lims, ylim = axis_lims) + 
+      scale_shape_manual(values=c(1, 16, 2, 17)) + 
+      theme(legend.position="bottom") +
+      labs(x="Observed", y="Predicted", title="Predator medium")
+
+combined_plot <- grid.arrange(g1, g2, g3, ncol=3)
+legend <- get_legend(g0)  
+png("supplementary_figure_lmm_interaction_scatterplot.png", width=2000, height=800, units="px", res=200)
+grid.arrange(combined_plot, legend, nrow=2, top=textGrob(model_title, gp=gpar(fontsize=15)), heights=c(10, 1))
+dev.off()
+# dev.print(file="supplementary_figure_lmm_interaction_scatterplot.png", device=png, width=800)
+```
+
+```{r}
+library(partR2)
+library(patchwork)
+
+kb_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kb_data)
+kcl_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kcl_data)
+tetra_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = tetra_data)
+
+# Main effects only
+kb_partR2_cond <- partR2(kb_lmm, partvars=c("Treatment", "Species", "Timepoint", "Treatment:Species"), R2_type="conditional", nboot=100)
+kcl_partR2_cond <- partR2(kcl_lmm, partvars=c("Treatment", "Species", "Timepoint"), R2_type="conditional", nboot=100)
+tetra_partR2_cond <- partR2(tetra_lmm, partvars=c("Treatment", "Species", "Timepoint"), R2_type="conditional", nboot=100)
+
+kb_partR2_marg <- partR2(kb_lmm, partvars=c("Treatment", "Species", "Timepoint", "Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="marginal", nboot=100)
+kcl_partR2_marg <- partR2(kcl_lmm, partvars=c("Treatment", "Species", "Timepoint", "Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="marginal", nboot=100)
+tetra_partR2_marg <- partR2(tetra_lmm, partvars=c("Treatment", "Species", "Timepoint", "Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="marginal", nboot=100)
+
+terms <- c(kb_partR2_marg$R2$term[5:7], kcl_partR2_marg$R2$term[5:7], tetra_partR2_marg$R2$term[5:7])
+mediums <- c("Control", "Control", "Control", "Salt stress", "Salt stress", "Salt stress", "Predator", "Predator", "Predator")
+r2s <- c(kb_partR2_marg$R2$estimate[5:7], kcl_partR2_marg$R2$estimate[5:7], tetra_partR2_marg$R2$estimate[5:7])
+r2_data <- data.frame(Medium=mediums, Term=terms, R2=r2s)
+
+ggplot(r2_data, aes(fill=Term, y=R2, x=Medium)) + geom_bar(position="stack", stat="identity") + ylim(0, 1) + labs(title="Interaction model\nExplained variance by main terms")
+
+# Only interactions
+kb_partR2_int_cond <- partR2(kb_lmm, partvars=c("Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="conditional", nboot=100)
+kcl_partR2_int_cond <- partR2(kcl_lmm, partvars=c("Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="conditional", nboot=100)
+tetra_partR2_int_cond <- partR2(tetra_lmm, partvars=c("Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="conditional", nboot=100)
+
+kb_partR2_int_marg <- partR2(kb_lmm, partvars=c("Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="marginal", nboot=100)
+kcl_partR2_int_marg <- partR2(kcl_lmm, partvars=c("Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="marginal", nboot=100)
+tetra_partR2_int_marg <- partR2(tetra_lmm, partvars=c("Treatment:Species", "Treatment:Timepoint", "Species:Timepoint"), R2_type="marginal", nboot=100)
+
+kb_int_total_R2 <- kb_partR2_cond$R2$estimate[1]
+kcl_int_total_R2 <- kcl_partR2_cond$R2$estimate[1]
+tetra_int_total_R2 <- tetra_partR2_cond$R2$estimate[1]
+
+kb_int_stacked <- c(kb_fixed_R2, kb_residual_R2)
+kcl_int_stacked <- c(kcl_fixed_R2, kcl_residual_R2)
+tetra_int_stacked <- c(tetra_fixed_R2, tetra_residual_R2)
+
+terms <- c(kb_partR2_marg$R2$term[2:4], "Residual", kcl_partR2_marg$R2$term[2:4], "Residual", tetra_partR2_marg$R2$term[2:4], "Residual")
+mediums <- c("Control", "Control", "Control", "Control", "Salt stress", "Salt stress", "Salt stress", "Salt stress", "Predator", "Predator", "Predator", "Predator")
+r2s <- c(kb_stacked, kcl_stacked, tetra_stacked)
+# r2_data <- data.frame(Medium=mediums, Term=terms, R2=r2s)
+
+
+# With grouping
+grouped_terms = list(Treatment_group=c("Treatment", "Treatment:Species", "Treatment:Timepoint"), 
+                     Species_group=c("Species", "Treatment:Species", "Species:Timepoint"), 
+                     Timepoint_group=c("Timepoint", "Treatment:Timepoint", "Species:Timepoint"))
+
+kb_partR2_cond <- partR2(kb_lmm, partbatch=grouped_terms, R2_type="conditional", nboot=100)
+kcl_partR2_cond <- partR2(kcl_lmm, partbatch=grouped_terms, R2_type="conditional", nboot=100)
+tetra_partR2_cond <- partR2(tetra_lmm, partbatch=grouped_terms, R2_type="conditional", nboot=100)
+
+kb_partR2_marg <- partR2(kb_lmm, partbatch=grouped_terms, R2_type="marginal", nboot=100)
+kcl_partR2_marg <- partR2(kcl_lmm, partbatch=grouped_terms, R2_type="marginal", nboot=100)
+tetra_partR2_marg <- partR2(tetra_lmm, partbatch=grouped_terms, R2_type="marginal", nboot=100)
+
+terms <- c(kb_partR2_marg$R2$term[2:4], kcl_partR2_marg$R2$term[2:4], tetra_partR2_marg$R2$term[2:4])
+mediums <- c("Control", "Control", "Control", "Salt stress", "Salt stress", "Salt stress", "Predator", "Predator", "Predator")
+r2s <- c(kb_partR2_marg$R2$estimate[2:4], kcl_partR2_marg$R2$estimate[2:4], tetra_partR2_marg$R2$estimate[2:4])
+r2_data <- data.frame(Medium=mediums, Term=terms, R2=r2s)
+
+ggplot(r2_data, aes(fill=Term, y=R2, x=Medium)) + geom_bar(position="stack", stat="identity") + ylim(0, 1) + labs(title="Interaction model\nExplained variance by main and interaction terms")
+```
+
+```{r}
+qqnorm(residuals(kb_lmm))
+qqline(residuals(kb_lmm))
+shapiro.test(residuals(kb_lmm))
+
+qqnorm(residuals(kcl_lmm))
+qqline(residuals(kcl_lmm))
+shapiro.test(residuals(kcl_lmm))
+
+qqnorm(residuals(tetra_lmm))
+qqline(residuals(tetra_lmm))
+shapiro.test(residuals(tetra_lmm))
+```
+
+# Log-likelihood testing
+
+## No-interaction vs. interaction model
+
+```{r}
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint                             + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment*Species + Treatment*Timepoint + Species*Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Significant!
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint                             + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment*Species + Treatment*Timepoint + Species*Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint                             + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment*Species + Treatment*Timepoint + Species*Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+```
+
+```{r}
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint                                                               + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Significant!
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint                                                               + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint                                                               + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+```
+
+## Testing fixed effects in the no-interaction model
+
+```{r}
+# Treatment
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~             Species + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Non-significant
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~             Species + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Non-significant
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~             Species + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+
+# Species
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment           + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Significant!
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment           + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment           + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+
+# Timepoint
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment + Species             + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Significant!
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment + Species             + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment + Species             + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+```
+
+## Testing interactions in the interaction model
+
+```{r}
+# Treatment*Species
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment * Species + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Significant!
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment * Species + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment * Species + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+
+
+# Species*Timepoint
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment + Species * Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Significant!
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment + Species * Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment + Species * Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+
+
+# Treatment*Timepoint
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Species + Treatment * Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Non-significant
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Species + Treatment * Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Species + Treatment * Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+
+```
+
+```{r}
+# Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate)
+
+# Treatment:Species
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment + Species + Timepoint                     + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Significant!
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment + Species + Timepoint                     + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment + Species + Timepoint                     + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+
+
+# Species:Timepoint
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint                    + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Significant!
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint                     + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint                     + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant!
+
+
+# Treatment:Timepoint
+kb_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+kb_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species                       + Species:Timepoint + (1|Replicate), data = kb_data, REML=FALSE)
+anova(kb_null_model, kb_test_model)        # Non-significant
+
+kcl_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+kcl_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species                       + Species:Timepoint + (1|Replicate), data = kcl_data, REML=FALSE)
+anova(kcl_null_model, kcl_test_model)      # Significant!
+
+tetra_null_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+tetra_test_model = lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species                       + Species:Timepoint + (1|Replicate), data = tetra_data, REML=FALSE)
+anova(tetra_null_model, tetra_test_model)  # Significant
+```
+
+```{r}
+library(emmeans)
+
+kb_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kb_data)
+kcl_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = kcl_data)
+tetra_lmm <- lmer(Ratio ~ Treatment + Species + Timepoint + Treatment:Species + Treatment:Timepoint + Species:Timepoint + (1|Replicate), data = tetra_data)
+
+emmeans(kb_lmm, pairwise ~ Treatment | Species:Timepoint)
+```
